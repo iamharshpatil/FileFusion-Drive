@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FileFusion Drive</title>
+
+  <!-- Tailwind CSS -->
+  <link href="/dist/style.css" rel="stylesheet">
+
+  <!-- Flowbite CSS -->
+  <link href="https://unpkg.com/flowbite@1.5.1/dist/flowbite.min.css" rel="stylesheet" />
+</head>
+
+<body class="bg-gray-900 text-white">
+
+  <!-- Navbar -->
+  <nav class="bg-gray-800 shadow-md">
+    <div class="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
+      <div class="text-xl font-semibold text-gray-300">FileFusion Drive</div>
+      <div class="flex items-center space-x-4">
+        <p id="loggedInUser" class="text-gray-400">Logged in as: <span class="text-white font-semibold"><%= user.username %></span></p>
+        <button id="uploadBtn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring focus:ring-blue-500" onclick="openUploadModal()">Upload</button>
+        <!-- Logout Button -->
+        <form action="/logout" method="POST" class="inline-block">
+          <button type="submit" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 focus:outline-none focus:ring focus:ring-red-500">Logout</button>
+        </form>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <div class="container mx-auto px-6 py-8">
+
+    <!-- Display Files Section -->
+    <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
+      <% if (files && files.length > 0) { %>
+        <% files.forEach((file) => { %>
+          <div class="file-card bg-gray-800 rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-shadow duration-300">
+            <img src="<%= file.path %>" alt="<%= file.originalname %>" class="w-full h-48 object-cover">
+
+            <div class="p-4">
+              <p class="text-sm font-medium text-gray-300 truncate" title="<%= file.originalname %>"><%= file.originalname %></p>
+
+              <!-- Download Button -->
+              <a href="<%= file.path %>" download class="mt-2 inline-block bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg text-center focus:outline-none focus:ring focus:ring-blue-500">
+                Download
+              </a>
+              
+
+            </div>
+          </div>
+        <% }) %>
+      <% } else { %>
+        <p class="col-span-full text-center text-gray-400">No files uploaded yet. Upload a file to get started!</p>
+      <% } %>
+    </div>
+
+  </div>
+
+  <!-- Upload Modal -->
+  <div id="uploadModal" class="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center hidden">
+    <div class="bg-gray-800 p-6 rounded-lg max-w-md w-full">
+      <div class="flex justify-between items-center">
+        <h2 class="text-2xl font-semibold text-gray-200">Upload Files</h2>
+        <button onclick="closeUploadModal()" class="text-gray-400 hover:text-white">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      <p class="text-gray-400 mb-2">Allowed file types: <strong>jpg, png, jpeg, gif, pdf, docx, pptx</strong>. Max size: <strong>5 MB</strong> per file.</p>
+
+      <!-- Flowbite Drag and Drop File Uploader -->
+      <form id="fileForm" action="/upload" method="post" enctype="multipart/form-data">
+        <div class="w-full">
+          <label for="file_input" class="flex flex-col items-center justify-center p-4 border-2 border-dashed border-gray-500 rounded-lg cursor-pointer hover:bg-gray-700 transition duration-200" aria-label="File Upload">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10 mb-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            </svg>
+            <span class="text-gray-400">Drag & Drop or Click to Select Files</span>
+            <input id="file_input" type="file" class="hidden" multiple name="file" accept="image/*,.pdf,.docx,.pptx" />
+          </label>
+        </div>
+
+        <!-- Selected File Info -->
+        <div id="fileInfo" class="mt-4 text-gray-300 hidden">
+          <p id="fileDetails"></p>
+          <div id="previewContainer" class="flex flex-wrap mt-2 gap-2"></div>
+        </div>
+
+        <!-- Submit Button -->
+        <div id="submitBtnDiv" class="mt-4 hidden">
+          <button type="submit" id="submitBtn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring focus:ring-blue-500">Submit</button>
+        </div>
+        <!-- Loading Spinner -->
+        <div id="loadingSpinner" class="hidden mt-4 text-center">
+          <svg class="w-6 h-6 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="3 3 18 18">
+            <circle cx="9" cy="9" r="6" stroke="currentColor" stroke-width="2" class="opacity-25"></circle>
+            <path fill="currentColor" d="M3 3h18v18H3z" class="opacity-75"></path>
+          </svg>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Flowbite JS -->
+  <script src="https://unpkg.com/flowbite@1.5.1/dist/flowbite.min.js"></script>
+
+  <!-- File Upload JavaScript -->
+  <script>
+    const fileInput = document.getElementById('file_input');
+    const uploadModal = document.getElementById('uploadModal');
+    const submitBtnDiv = document.getElementById('submitBtnDiv');
+    const submitBtn = document.getElementById('submitBtn');
+    const loadingSpinner = document.getElementById('loadingSpinner');
+    const fileInfo = document.getElementById('fileInfo');
+    const fileDetails = document.getElementById('fileDetails');
+    const previewContainer = document.getElementById('previewContainer');
+    const fileForm = document.getElementById('fileForm');
+
+    // Open the upload modal
+    function openUploadModal() {
+      uploadModal.classList.remove('hidden');
+    }
+
+    // Close the upload modal
+    function closeUploadModal() {
+      uploadModal.classList.add('hidden');
+    }
+
+    // Handle file selection
+    fileInput.addEventListener('change', function () {
+      const files = Array.from(fileInput.files);
+      previewContainer.innerHTML = ''; // Clear previous previews
+
+      if (files.length > 0) {
+        const fileList = files
+          .map((file) => {
+            const sizeMB = (file.size / 1024 / 1024).toFixed(2);
+            if (sizeMB > 5) {
+              return `<span class="text-red-500">${file.name} (Too large: ${sizeMB} MB)</span>`;
+            }
+            return `<strong>${file.name}</strong> (${sizeMB} MB)`;
+          })
+          .join('<br>');
+
+        fileDetails.innerHTML = `Selected Files:<br>${fileList}`;
+        fileInfo.classList.remove('hidden');
+        submitBtnDiv.classList.remove('hidden');
+
+        // Generate previews for image files
+        files.forEach((file) => {
+          if (file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              const img = document.createElement('img');
+              img.src = e.target.result;
+              img.alt = file.name;
+              img.classList.add('w-24', 'h-24', 'object-cover', 'rounded-lg');
+              previewContainer.appendChild(img);
+            };
+            reader.readAsDataURL(file);
+          }
+        });
+      }
+    });
+
+    // Handle form submission (file upload)
+    fileForm.addEventListener('submit', async (event) => {
+      event.preventDefault(); // Prevent the default form submission
+
+      const formData = new FormData(fileForm);
+
+      // Show the loading spinner and hide the submit button
+      submitBtn.classList.add('hidden');
+      loadingSpinner.classList.remove('hidden');
+
+      try {
+        const response = await fetch('/upload', {
+          method: 'POST',
+          body: formData,
+        });
+
+        const data = await response.json();
+        if (response.ok) {
+          // If the upload is successful, show a success alert
+          Swal.fire('Success!', 'File uploaded successfully!', 'success');
+          resetUploadArea(); // Reset the upload modal
+        } else {
+          // If there's an error, show an error message
+          Swal.fire('Error!', data.message, 'error');
+        }
+      } catch (error) {
+        console.error('Error uploading file:', error);
+        Swal.fire('Error!', 'Error uploading file.', 'error');
+      } finally {
+        // Hide the loading spinner and show the submit button again
+        submitBtn.classList.remove('hidden');
+        loadingSpinner.classList.add('hidden');
+
+        // Close the upload modal automatically
+        closeUploadModal(); // Close the modal after file upload
+      }
+    });
+
+    function resetUploadArea() {
+      fileInput.value = '';
+      previewContainer.innerHTML = '';
+      fileInfo.classList.add('hidden');
+      submitBtnDiv.classList.add('hidden');
+    }
+
+
+
+
+        // Function to delete a file via AJAX
+        async function deleteFile(fileId) {
+      try {
+        // Send a POST request to delete the file
+        const response = await fetch(`/delete/${fileId}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+          // If deletion is successful, remove the file from the display
+          const fileElement = document.getElementById(`file-${fileId}`);
+          fileElement.remove(); // Remove the file card from the display
+        } else {
+          alert(result.message || 'Error deleting file');
+        }
+      } catch (error) {
+        console.error('Error deleting file:', error);
+        alert('Error deleting file');
+      }
+    }
+
+
+  </script>
+
+</body>
+
+</html>
